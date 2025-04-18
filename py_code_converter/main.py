@@ -10,7 +10,7 @@ def main():
     covered_area = np.zeros((100, 100))
     obstacle_area = gen_random_distribution_area()
     # max_iterations = 50
-    max_iterations = 20
+    max_iterations = 30
     n_nodes = 40
     # population_size = 50
     population_size = 30
@@ -22,6 +22,7 @@ def main():
     onlooker_bees = population_size
     acceleration = 1
     l_counts = np.zeros(population_size)
+    
     best_solution = {'position': None, 'cost': 0}
     population = []
 
@@ -40,10 +41,11 @@ def main():
 
     # Optimization loop
     for it in range(max_iterations):
-        # Scout bee phase
+        # global search
         for i in range(scout_bees):
             k = np.random.randint(population_size)
-            phi = acceleration * np.random.uniform(-1, 1, (n_nodes, 3))
+            # phi = acceleration * np.random.uniform(-1, 1, (n_nodes, 3))
+            phi = acceleration * np.random.uniform(-1, 1, 3) * (1 - l_counts[i] / max_iterations) ** 2
             alpop = population[i]['position'] + phi * (population[i]['position'] - population[k]['position'])
             alpop[:, :2] = np.clip(alpop[:, :2], 1, 99)
             alpop[:, 2] = np.mod(alpop[:, 2], 2 * np.pi)
@@ -55,14 +57,21 @@ def main():
                         best_solution = {'position': alpop.copy(), 'cost': alpop_cost}
                 else:
                     l_counts[i] += 1
-
-        # Onlooker bee phase
-        e_ave = np.array([ind['cost'] for ind in population]) / sum(ind['cost'] for ind in population)
-        for _ in range(onlooker_bees):
+        
+        
+        # ranking population
+        costs = np.array([ind['cost'] for ind in population])
+        total_cost = np.sum(costs)  
+        e_ave = costs / total_cost
+        
+        # local search
+        for j in range(onlooker_bees):
+            # randomly choose a pop, prioritize that have high coverage
             i = np.random.choice(population_size, p=e_ave)
+            
             for k in range(n_nodes):
                 h = np.random.randint(n_nodes)
-                phi = acceleration * np.random.uniform(-1, 1, 3)
+                phi = acceleration * np.random.uniform(-1, 1, 3) * (1 - l_counts[i] / max_iterations) ** 2
                 alpop = population[i]['position'].copy()
                 alpop[k] += phi * (population[i]['position'][k] - population[i]['position'][h])
                 alpop[:, :2] = np.clip(alpop[:, :2], 1, 99)
@@ -73,41 +82,41 @@ def main():
                         population[i] = {'position': alpop, 'cost': alpop_cost}
                         if alpop_cost > best_solution['cost']:
                             best_solution = {'position': alpop.copy(), 'cost': alpop_cost}
-                    else:
-                        l_counts[i] += 1
+                    # else:
+                    #     l_counts[i] += 1
 
         print(f"Iteration {it + 1}: Best Cost = {best_solution['cost']:.4f}")
 
     # Visualization
-    visualize_solution(best_solution, obstacle_area, covered_area, sensing_radius, theta0)
+    visualize_solution(best_solution, obstacle_area, covered_area, sensing_radius, theta0, n_nodes=40)
 
-def visualize_solution(solution, obstacle_area, covered_area, sensing_radius, theta0):
+def visualize_solution(solution, obstacle_area, covered_area, sensing_radius, theta0, n_nodes=40):
     plt.figure(figsize=(10, 10))
     alpop = solution['position']
     coverage, covered_area = cov_func(alpop, sensing_radius, theta0, obstacle_area, covered_area.copy())
     
     # Plot sensor positions
-    for i in range(len(alpop)):
-        plt.plot(alpop[i, 1], alpop[i, 0], 'ro', markersize=3, color='red')  # Match MATLAB red color
+    for i in range(n_nodes):
+        plt.plot(alpop[i, 1], alpop[i, 0], 'ro', markersize=3, color='red')
         plt.text(alpop[i, 1], alpop[i, 0], str(i + 1), fontsize=10, color='red')
 
     # Plot obstacle area
     obs_row, obs_col = np.where(obstacle_area == 1)
-    plt.plot(obs_col, obs_row, '.', markersize=1, color='blue')  # Match MATLAB blue color
+    plt.plot(obs_col, obs_row, '.', markersize=1, color='blue')
 
     # Plot partially covered area
     obs_row, obs_col = np.where(covered_area == 0.5)
-    plt.plot(obs_col, obs_row, '.', markersize=1, color='green')  # Match MATLAB green color
+    plt.plot(obs_col, obs_row, '.', markersize=1, color='green')
 
     # Plot fully covered area
     obs_row, obs_col = np.where(covered_area == 1)
-    plt.plot(obs_col, obs_row, '.', markersize=2, color='red')  # Match MATLAB red color
+    plt.plot(obs_col, obs_row, '.', markersize=2, color='red')
 
     # Adjust axis limits and grid
     plt.grid(True)
     plt.axis('equal')
-    plt.xlim([0, obstacle_area.shape[1] - 1])  # Match MATLAB x-axis limits
-    plt.ylim([0, obstacle_area.shape[0] - 1])  # Match MATLAB y-axis limits
+    plt.xlim([0, obstacle_area.shape[0] - 1])  # Match MATLAB x-axis limits
+    plt.ylim([0, obstacle_area.shape[1] - 1])  # Match MATLAB y-axis limits
     plt.title(f'Weighted Coverage ratio: {coverage * 100:.2f}%')
     plt.show()
 

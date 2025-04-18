@@ -5,6 +5,7 @@ def cov_func(pop, rs, theta0, obstacle_area, covered_area):
     Calculate the coverage ratio and update the covered area.
     """
     covered_area[covered_area != 0] = 0  # Reset covered area
+    
     for sensor in pop:
         start_point = np.floor(sensor[:2]).astype(int)
         for i in range(-rs - 1, rs + 2):
@@ -29,5 +30,6 @@ def cov_func(pop, rs, theta0, obstacle_area, covered_area):
     count2 = np.sum(covered_area == -2)
     count3 = np.sum(obstacle_area == 1)
     coverage = (count1 - count2) / count3
+    
     covered_area[covered_area == -2] = -1
     return coverage, covered_area
